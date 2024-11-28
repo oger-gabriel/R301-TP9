@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /*
  * This file is part of the OpenClassRoom PHP Object Course.
  *
@@ -9,12 +11,90 @@
  * file that was distributed with this source code.
  */
 
-declare(strict_types=1);
+abstract class AbstractPlayer
+{
+    protected string $name;
+    protected float $ratio;
 
-class Lobby
+    public function __construct(string $name, float $ratio = 400.0)
+    {
+        $this->name = $name;
+        $this->ratio = max(0, $ratio); // Assurer que le ratio est positif.
+    }
+
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    public function getRatio(): float
+    {
+        return $this->ratio;
+    }
+
+    abstract public function updateRatioAgainst(self $player, int $result): void;
+}
+
+final class Player extends AbstractPlayer
+{
+    private function probabilityAgainst(self $player): float
+    {
+        return 1 / (1 + 10 ** (($player->getRatio() - $this->getRatio()) / 400));
+    }
+
+    public function updateRatioAgainst(AbstractPlayer $player, int $result): void
+    {
+        $this->ratio += 32 * ($result - $this->probabilityAgainst($player));
+    }
+}
+
+final class QueuingPlayer extends AbstractPlayer
+{
+    private int $range;
+
+    public function __construct(AbstractPlayer $player, int $range = 100)
+    {
+        parent::__construct($player->getName(), $player->getRatio());
+        $this->setRange($range);
+    }
+
+    public function getRange(): int
+    {
+        return $this->range;
+    }
+
+    public function setRange(int $range): void
+    {
+        if ($range < 0) {
+            throw new InvalidArgumentException("Range must be non-negative.");
+        }
+        $this->range = $range;
+    }
+
+    public function updateRatioAgainst(AbstractPlayer $player, int $result): void
+    {
+        // Implement behavior for QueuingPlayer if needed
+        // Otherwise, leave it empty or throw an exception
+        throw new LogicException("QueuingPlayer does not implement `updateRatioAgainst`.");
+    }
+}
+
+final class Lobby
 {
     /** @var array<QueuingPlayer> */
     public array $queuingPlayers = [];
+
+    public function addPlayer(AbstractPlayer $player, int $range = 100): void
+    {
+        $this->queuingPlayers[] = new QueuingPlayer($player, $range);
+    }
+
+    public function addPlayers(AbstractPlayer ...$players): void
+    {
+        foreach ($players as $player) {
+            $this->addPlayer($player);
+        }
+    }
 
     public function findOponents(QueuingPlayer $player): array
     {
@@ -31,71 +111,11 @@ class Lobby
             return $player !== $potentialOponent && $minLevel <= $playerLevel && $playerLevel <= $maxLevel;
         });
     }
-
-    public function addPlayer(Player $player): void
-    {
-        $this->queuingPlayers[] = new QueuingPlayer($player);
-    }
-
-    public function addPlayers(Player ...$players): void
-    {
-        foreach ($players as $player) {
-            $this->addPlayer($player);
-        }
-    }
 }
 
-class Player
-{
-    public function __construct(protected string $name, protected float $ratio = 400.0)
-    {
-    }
-
-    public function getName(): string
-    {
-        return $this->name;
-    }
-
-    private function probabilityAgainst(self $player): float
-    {
-        return 1 / (1 + 10 ** (($player->getRatio() - $this->getRatio()) / 400));
-    }
-
-    public function updateRatioAgainst(self $player, int $result): void
-    {
-        $this->ratio += 32 * ($result - $this->probabilityAgainst($player));
-    }
-
-    public function getRatio(): float
-    {
-        return $this->ratio;
-    }
-}
-
-class QueuingPlayer extends Player
-{
-    protected int $range;
-
-    public function __construct(Player $player, int $range = 100)
-    {
-        // Appeler le constructeur de la classe parente pour initialiser les propriétés héritées
-        parent::__construct($player->getName(), $player->getRatio());
-        $this->range = $range;
-    }
-
-    public function getRange(): int
-    {
-        return $this->range;
-    }
-
-    public function setRange(int $range): void
-    {
-        $this->range = $range;
-    }
-}
-
-$greg = new Player("greg", 400);
-$jade = new Player("jade", 476);
+// Example usage
+$greg = new Player("Greg", 400);
+$jade = new Player("Jade", 476);
 
 $lobby = new Lobby();
 $lobby->addPlayers($greg, $jade);
