@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /*
  * This file is part of the OpenClassRoom PHP Object Course.
  *
@@ -10,6 +8,8 @@ declare(strict_types=1);
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
  */
+
+declare(strict_types=1);
 
 abstract class AbstractPlayer
 {
@@ -32,7 +32,7 @@ abstract class AbstractPlayer
         return $this->ratio;
     }
 
-    abstract public function updateRatioAgainst(self $player, int $result): void;
+    abstract public function updateRatioAgainst(AbstractPlayer $player, int $result): void;
 }
 
 final class Player extends AbstractPlayer
@@ -73,9 +73,25 @@ final class QueuingPlayer extends AbstractPlayer
 
     public function updateRatioAgainst(AbstractPlayer $player, int $result): void
     {
-        // Implement behavior for QueuingPlayer if needed
-        // Otherwise, leave it empty or throw an exception
         throw new LogicException("QueuingPlayer does not implement `updateRatioAgainst`.");
+    }
+}
+
+final class BlitzPlayer extends AbstractPlayer
+{
+    public function __construct(string $name)
+    {
+        parent::__construct($name, 1200); // Début à 1200
+    }
+
+    private function probabilityAgainst(self $player): float
+    {
+        return 1 / (1 + 10 ** (($player->getRatio() - $this->getRatio()) / 400));
+    }
+
+    public function updateRatioAgainst(AbstractPlayer $player, int $result): void
+    {
+        $this->ratio += 4 * 32 * ($result - $this->probabilityAgainst($player)); // Évolution rapide
     }
 }
 
@@ -115,7 +131,7 @@ final class Lobby
 
 // Example usage
 $greg = new Player("Greg", 400);
-$jade = new Player("Jade", 476);
+$jade = new BlitzPlayer("Jade");
 
 $lobby = new Lobby();
 $lobby->addPlayers($greg, $jade);
